@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Hedge Fund</title>
+<style>
+  :root {
+    --bg: #f6f5f1; --card: #ffffff; --ink: #1b1b18; --muted: #6b6a63; --line: #e4e2da;
+    --fund: #2f5bd3; --spy: #9a978c; --up: #18794e; --down: #c2362b; --hold: #8a6d00;
+    --up-bg: #e3f4ea; --down-bg: #fbe6e3; --hold-bg: #fbf1cf; --accent-bg: #eef2fd;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #141413; --card: #1e1e1c; --ink: #ecebe6; --muted: #9c9a91; --line: #33322e;
+      --fund: #7a9dff; --spy: #8a877d; --up: #4cc38a; --down: #f07468; --hold: #e3c04d;
+      --up-bg: #183326; --down-bg: #3a1d1a; --hold-bg: #352d10; --accent-bg: #1d2540;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #141413; --card: #1e1e1c; --ink: #ecebe6; --muted: #9c9a91; --line: #33322e;
+    --fund: #7a9dff; --spy: #8a877d; --up: #4cc38a; --down: #f07468; --hold: #e3c04d;
+    --up-bg: #183326; --down-bg: #3a1d1a; --hold-bg: #352d10; --accent-bg: #1d2540;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 28px 16px 60px; }
+  header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; }
+  h1 { margin: 0; font-size: 26px; letter-spacing: -0.02em; }
+  h2 { margin: 0 0 12px; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+  .sub { color: var(--muted); font-size: 14px; }
+  .pill { display: inline-block; padding: 2px 10px; border-radius: 99px; font-size: 12px; font-weight: 600; }
+  .grid { display: grid; gap: 14px; margin-top: 18px; }
+  .kpis { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+  .two { grid-template-columns: 1fr; }
+  @media (min-width: 860px) { .two { grid-template-columns: 1.4fr 1fr; } }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px; min-width: 0; }
+  .kpi .label { color: var(--muted); font-size: 13px; }
+  .kpi .val { font-size: 26px; font-weight: 650; font-variant-numeric: tabular-nums; margin-top: 2px; }
+  .kpi .note { color: var(--muted); font-size: 12px; }
+  .pos { color: var(--up); } .neg { color: var(--down); }
+  .legend { display: flex; gap: 16px; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  .legend i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+  svg text { fill: var(--muted); font-size: 11px; }
+  .summary { font-size: 16px; background: var(--accent-bg); border-radius: 10px; padding: 14px 16px; margin: 0 0 14px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th { text-align: left; font-weight: 600; color: var(--muted); font-size: 12px; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+  td { padding: 9px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr:last-child td { border-bottom: 0; }
+  .scroll { overflow-x: auto; }
+  .buy { background: var(--up-bg); color: var(--up); }
+  .sell, .avoid { background: var(--down-bg); color: var(--down); }
+  .hold { background: var(--hold-bg); color: var(--hold); }
+  .reason { color: var(--muted); font-size: 13px; }
+  .steps { list-style: none; padding: 0; margin: 0; }
+  .steps li { padding: 6px 0; border-bottom: 1px dashed var(--line); font-size: 14px; }
+  .steps li:last-child { border: 0; }
+  code { font: 12.5px ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--bg); padding: 1px 5px; border-radius: 4px; }
+  .agent { font-weight: 600; margin: 12px 0 4px; }
+  .agent:first-child { margin-top: 0; }
+  .limits { margin: 0; padding-left: 18px; }
+  .limits li { margin: 3px 0; }
+  .empty { color: var(--muted); text-align: center; padding: 60px 0; }
+  .runs { display: flex; gap: 6px; flex-wrap: wrap; }
+  .runs button { border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 8px;
+                 padding: 4px 10px; font-size: 12px; cursor: pointer; }
+  .runs button.active { background: var(--fund); color: #fff; border-color: var(--fund); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>AI Hedge Fund</h1>
+      <div class="sub">Two AI agents research and trade a paper account. Benchmark: S&amp;P 500 (SPY).</div>
+    </div>
+    <div class="sub" id="updated"></div>
+  </header>
+  <div id="app"><div class="empty">Loading…</div></div>
+</div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const money = (n) => "$" + Number(n).toLocaleString(undefined, {maximumFractionDigits: 0});
+const pct = (n) => (n >= 0 ? "+" : "") + n.toFixed(2) + "%";
+const cls = (n) => n > 0.0001 ? "pos" : n < -0.0001 ? "neg" : "";
+const when = (t) => new Date(t).toLocaleString([], {month: "short", day: "numeric", hour: "numeric", minute: "2-digit"});
+
+let LOG, selected;
+
+function chart(runs, base) {
+  const pts = runs.filter(r => r.equity && r.spy).map(r => ({
+    t: r.time, fund: (r.equity / base.equity - 1) * 100, spy: (r.spy / base.spy - 1) * 100 }));
+  if (pts.length < 2) return `<div class="empty" style="padding:40px 0">The chart fills in after a few runs.<br>
+    So far: fund ${pct(pts[0]?.fund ?? 0)}, S&amp;P 500 ${pct(pts[0]?.spy ?? 0)}</div>`;
+  const W = 640, H = 220, P = {l: 46, r: 10, t: 10, b: 24};
+  const vals = pts.flatMap(p => [p.fund, p.spy]);
+  let lo = Math.min(0, ...vals), hi = Math.max(0, ...vals);
+  if (hi - lo < 0.5) { hi += 0.25; lo -= 0.25; }
+  const x = (i) => P.l + i * (W - P.l - P.r) / (pts.length - 1);
+  const y = (v) => P.t + (hi - v) * (H - P.t - P.b) / (hi - lo);
+  const line = (k) => pts.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(p[k]).toFixed(1)}`).join("");
+  const ticks = [hi, (hi + lo) / 2, lo];
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Fund vs S&P 500">
+    ${ticks.map(v => `<line x1="${P.l}" x2="${W - P.r}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/>
+      <text x="${P.l - 6}" y="${y(v) + 4}" text-anchor="end">${pct(v)}</text>`).join("")}
+    <line x1="${P.l}" x2="${W - P.r}" y1="${y(0)}" y2="${y(0)}" stroke="var(--muted)" stroke-dasharray="3 3"/>
+    <path d="${line("spy")}" fill="none" stroke="var(--spy)" stroke-width="2"/>
+    <path d="${line("fund")}" fill="none" stroke="var(--fund)" stroke-width="2.5"/>
+    <text x="${P.l}" y="${H - 6}">${when(pts[0].t)}</text>
+    <text x="${W - P.r}" y="${H - 6}" text-anchor="end">${when(pts.at(-1).t)}</text>
+  </svg>`;
+}
+
+function render() {
+  const runs = LOG.runs, base = LOG.baseline;
+  if (!runs.length) { $("#app").innerHTML = `<div class="empty">No runs yet.</div>`; return; }
+  const latest = runs.at(-1);
+  const decisionRuns = runs.filter(r => r.status === "ok");
+  const r = decisionRuns.find(x => x.time === selected) || decisionRuns.at(-1);
+  const fundPct = (latest.equity / base.equity - 1) * 100;
+  const spyPct = latest.spy && base.spy ? (latest.spy / base.spy - 1) * 100 : 0;
+  const edge = fundPct - spyPct;
+  const positions = r?.positions || [];
+  const paused = latest.status === "paused";
+  $("#updated").innerHTML = `Last run ${when(latest.time)} · ` +
+    (paused ? `<span class="pill sell">Kill switch ON</span>` :
+     latest.dry_run ? `<span class="pill hold">Dry run</span>` : `<span class="pill buy">Live (paper)</span>`);
+
+  const rating = (x) => `<span class="pill ${esc(x)}">${esc(x)}</span>`;
+  const trades = [...(r?.approved || []).map(t => ({...t, ok: true})), ...(r?.rejected || []).map(t => ({...t, ok: false}))];
+
+  $("#app").innerHTML = `
+  <div class="grid kpis">
+    <div class="card kpi"><div class="label">Fund return</div><div class="val ${cls(fundPct)}">${pct(fundPct)}</div>
+      <div class="note">${money(latest.equity)} equity</div></div>
+    <div class="card kpi"><div class="label">S&amp;P 500 (SPY)</div><div class="val ${cls(spyPct)}">${pct(spyPct)}</div>
+      <div class="note">same period</div></div>
+    <div class="card kpi"><div class="label">Fund vs. market</div><div class="val ${cls(edge)}">${pct(edge)}</div>
+      <div class="note">${edge >= 0 ? "beating" : "trailing"} the S&amp;P 500</div></div>
+    <div class="card kpi"><div class="label">Cash</div><div class="val">${money(latest.cash)}</div>
+      <div class="note">${positions.length} stock${positions.length === 1 ? "" : "s"} held</div></div>
+  </div>
+
+  <div class="grid two">
+    <div class="card">
+      <h2>Fund vs. S&amp;P 500 since ${when(base.time)}</h2>
+      <div class="legend"><span><i style="background:var(--fund)"></i>AI fund</span><span><i style="background:var(--spy)"></i>S&amp;P 500</span></div>
+      ${chart(runs, base)}
+    </div>
+    <div class="card">
+      <h2>Safety rules (enforced in code)</h2>
+      <ul class="limits">
+        <li>Only the 10 watchlist stocks</li>
+        <li>Max $10,000 per trade</li>
+        <li>Max 6 stocks held at once</li>
+        <li>No short selling</li>
+        <li>No new buys if the fund is down 3% on the day</li>
+        <li>Kill switch: ${paused ? "<b class='neg'>ON — trading stopped</b>" : "off"}</li>
+      </ul>
+      <p class="reason" style="margin:12px 0 0">The AI proposes; plain code checks every trade before anything is placed.</p>
+    </div>
+  </div>
+
+  ${r ? `
+  <div class="grid"><div class="card">
+    <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px">
+      <h2 style="margin:0">Portfolio Manager decision · ${when(r.time)}</h2>
+      <div class="runs">${decisionRuns.slice(-8).map(x => `<button data-t="${esc(x.time)}" class="${x === r ? "active" : ""}">${when(x.time)}</button>`).join("")}</div>
+    </div>
+    <p class="summary">${esc(r.summary) || "No summary."}</p>
+    <div class="scroll"><table>
+      <tr><th>Trade</th><th>Amount</th><th>Why</th><th>Status</th></tr>
+      ${trades.length ? trades.map(t => `<tr>
+        <td><span class="pill ${esc(t.side)}">${esc(t.side)}</span> <b>${esc(t.symbol)}</b></td>
+        <td>${t.side === "sell" ? "entire position" : money(t.dollars)}</td>
+        <td class="reason">${esc(t.reason)}${t.note ? `<br><i>${esc(t.note)}</i>` : ""}</td>
+        <td>${t.ok ? `<span class="pill buy">approved</span><div class="reason">${esc(t.order_id)}</div>`
+                   : `<span class="pill sell">blocked</span><div class="reason">${esc(t.rejected_because)}</div>`}</td>
+      </tr>`).join("") : `<tr><td colspan="4" class="reason">No trades this run — the manager chose to wait.</td></tr>`}
+    </table></div>
+  </div></div>
+
+  <div class="grid two">
+    <div class="card">
+      <h2>Research Analyst notes</h2>
+      <p class="reason" style="margin-top:0">${esc(r.research?.market_view)}</p>
+      <div class="scroll"><table>
+        <tr><th>Stock</th><th>Rating</th><th>Conf.</th><th>Reason</th></tr>
+        ${(r.research?.notes || []).map(n => `<tr><td><b>${esc(n.symbol)}</b></td><td>${rating(n.rating)}</td>
+          <td>${esc(n.confidence)}/10</td><td class="reason">${esc(n.reason)}</td></tr>`).join("")}
+      </table></div>
+    </div>
+    <div class="card">
+      <h2>How the agents worked</h2>
+      <div class="agent">1 · Research Analyst</div>
+      <ul class="steps">${(r.research_steps || []).map(s => `<li>called <code>${esc(s.tool)}</code> for ${esc((s.args.symbols || []).join(", ") || "account")}</li>`).join("")}</ul>
+      <div class="agent">2 · Portfolio Manager</div>
+      <ul class="steps">${(r.pm_steps || []).map(s => `<li>called <code>${esc(s.tool)}</code>${s.args.symbols ? " for " + esc(s.args.symbols.join(", ")) : ""}</li>`).join("")}</ul>
+      <div class="agent">3 · Safety checks → Alpaca</div>
+      <ul class="steps"><li>${(r.approved || []).length} approved, ${(r.rejected || []).length} blocked${r.dry_run ? " (dry run: nothing sent)" : ""}</li></ul>
+      ${positions.length ? `<div class="agent" style="margin-top:16px">Holdings</div>
+        <table>${positions.map(p => `<tr><td><b>${esc(p.symbol)}</b></td><td>${money(p.market_value)}</td>
+          <td class="${cls(p.unrealized_pl_pct)}">${pct(p.unrealized_pl_pct)}</td></tr>`).join("")}</table>` : ""}
+    </div>
+  </div>` : ""}
+  `;
+  document.querySelectorAll(".runs button").forEach(b => b.onclick = () => { selected = b.dataset.t; render(); });
+}
+
+fetch("log.json", {cache: "no-store"})
+  .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+  .then(d => { LOG = d; render(); })
+  .catch(e => { $("#app").innerHTML = `<div class="empty">Couldn't load log.json (${esc(e.message)}).</div>`; });
+</script>
+</body>
+</html>

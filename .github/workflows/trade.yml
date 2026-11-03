@@ -1,0 +1,40 @@
+name: AI Hedge Fund run
+
+on:
+  schedule:
+    # Weekdays at 10:00 AM and 3:00 PM Eastern (times below are UTC; GitHub may start a few minutes late)
+    - cron: "0 15 * * 1-5"
+    - cron: "0 20 * * 1-5"
+  workflow_dispatch: # "Run workflow" button for live demos
+
+permissions:
+  contents: write
+
+concurrency:
+  group: trading
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - name: Run both agents and trade (paper account)
+        run: python main.py
+        env:
+          ALPACA_KEY: ${{ secrets.ALPACA_KEY }}
+          ALPACA_SECRET: ${{ secrets.ALPACA_SECRET }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          DRY_RUN: "false"
+      - name: Save the run log (updates the dashboard)
+        run: |
+          git config user.name "ai-hedge-fund-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add dashboard/log.json
+          git commit -m "Trading run $(date -u +'%Y-%m-%d %H:%M UTC')" || echo "No changes"
+          git pull --rebase && git push
